@@ -145,16 +145,22 @@ func (entry *Entry) output() {
 	if _, file, line, ok := runtime.Caller(2); ok {
 		if filepath.Base(file) == "logstash.go" {
 			if _, file, line, ok := runtime.Caller(3); ok {
-				entry.Fields["file"] = filepath.Base(file)
-				entry.Fields["line"] = line
+				entry.Fields["__file"] = filepath.Base(file)
+				entry.Fields["__line"] = line
 			}
 		} else {
-			entry.Fields["file"] = filepath.Base(file)
-			entry.Fields["line"] = line
+			entry.Fields["__file"] = filepath.Base(file)
+			entry.Fields["__line"] = line
 		}
 	}
 	for k, v := range entry.Fields {
-		keys += fmt.Sprintf(" \x1b[%dm%s\x1b[0m=%+v", red, k, v)
+		color := red
+		if k != "__line" && k != "__file" {
+			color = green
+			keys += fmt.Sprintf(" \x1b[%dm%s\x1b[0m=%+v", color, k, v)
+		} else {
+			keys += fmt.Sprintf(" \x1b[%dm%s\x1b[0m=%+v", color, k[2:], v)
+		}
 	}
 	entry.Time = time.Now().Format("Jan 2 15:04:05")
 	fmt.Printf("\x1b[%dm%s\x1b[0m[%s] %-40s %s\n", color, levelText, entry.Time, entry.Msg, keys)
