@@ -14,21 +14,50 @@ var logFileName string               // 日志文件的文件名
 var maxSize int64 = 10 * 1024 * 1024 // 文件的最大文件大小
 
 var dir string
-
 var prefix string
 
 var lock sync.Mutex
 
+// LoggerConfig 日志配置
+type LoggerConfig struct {
+	MaxSize       int64
+	Dir           string
+	Prefix        string
+	MaxBackups    int
+	MaxAge        int
+	LoggerLevel   Level
+	ConsoleOutput bool
+}
+
+var config LoggerConfig
+
+// Config 配置
+func Config(conf LoggerConfig) {
+	config = conf
+	if conf.MaxSize != 0 {
+		setMaxSize(conf.MaxSize)
+	}
+	if conf.Dir != "" {
+		setOutput(conf.Dir, conf.Prefix)
+	}
+	if conf.LoggerLevel == PanicLevel {
+		config.LoggerLevel = DebugLevel
+	}
+}
+
 // SetMaxSize 设置最大文件大小
-func SetMaxSize(m int64) {
+func setMaxSize(m int64) {
 	maxSize = m * 1024 * 1024
 }
 
 // SetOutput 设置文件输出
-func SetOutput(d, p string) {
+func setOutput(d, p string) {
 	var err error
 	dir = d
 	prefix = p
+	if prefix == "" {
+		prefix = "log"
+	}
 	if _, err = os.Stat(dir); os.IsNotExist(err) {
 		WithFields(Fields{"dir": dir}).Fatal("Directory is not exist.")
 		return
@@ -47,18 +76,17 @@ func SetOutput(d, p string) {
 
 func resetLogFile() {
 	var err error
-	lock.Lock()
 	fileOutput = false
 	if ok, err := checkFileSize(logFileName); ok && err == nil {
 		return
+	} else if err != nil {
+		Fatal(err.Error())
 	}
-	logFile, err = validLogFile(dir, path.Join(dir, prefix+".log"))
-	if err != nil {
+	if logFile, err = validLogFile(dir, path.Join(dir, prefix+".log")); err != nil {
 		Fatal(err.Error())
 		return
 	}
 	fileOutput = true
-	lock.Unlock()
 }
 
 func validLogFile(dir, file string) (*os.File, error) {
